@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM debian:11
 
 LABEL maintainer="Tomohisa Kusano <siomiz@gmail.com>"
 
@@ -17,6 +17,8 @@ RUN apt-get update && \
     x11vnc \
     fluxbox \
     eterm \
+    jq \
+    unzip \
     wget && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean && \
@@ -27,7 +29,11 @@ RUN wget --no-check-certificate -O /tmp/google-chrome-stable.deb https://dl.goog
     wget --no-check-certificate -O /tmp/chrome-remote-desktop.deb https://dl.google.com/linux/direct/chrome-remote-desktop_current_amd64.deb && \
     apt-get update && \
     apt-get install -y --no-install-recommends /tmp/google-chrome-stable.deb /tmp/chrome-remote-desktop.deb && \
-    rm /tmp/google-chrome-stable.deb /tmp/chrome-remote-desktop.deb
+    chrome_version=$(dpkg -l | grep google-chrome | awk '{print $3}' | cut -d'-' -f1) &&\
+    chromedriver_url=$(wget --no-check-certificate -qO- https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json | jq -r ".versions[] | select(.version == \"$chrome_version\") | .downloads.chromedriver[] | select(.platform == \"linux64\").url") &&\
+    wget --no-check-certificate -O /tmp/chromedriver.zip $chromedriver_url &&\
+    unzip -jo /tmp/chromedriver.zip 'chromedriver-linux64/chromedriver' -d /bin &&\
+    rm /tmp/google-chrome-stable.deb /tmp/chrome-remote-desktop.deb /tmp/chromedriver.zip
 
 # Configure the environment
 RUN useradd -m -G chrome-remote-desktop,pulse-access chrome && \
@@ -50,7 +56,7 @@ VOLUME ["/home/chrome"]
 
 WORKDIR /home/chrome
 
-EXPOSE 5900
+EXPOSE 5900 9515
 
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 
